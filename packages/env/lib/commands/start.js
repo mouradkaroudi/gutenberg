@@ -67,6 +67,20 @@ module.exports = async function start( { spinner, debug } ) {
 				.join( '\n' );
 	};
 
+	const sources = [];
+	const sourceKeys = [ 'pluginSources', 'themeSources' ];
+	// Adding config at the end lets us get more sources from the base config.
+	for ( const env in [ ...Object.values( config.env ), { ...config } ] ) {
+		sourceKeys.forEach( ( sourceKey ) => {
+			if ( env[ sourceKey ] ) {
+				sources.push( env[ sourceKey ] );
+			}
+		} );
+	}
+
+	const coreDevSource =
+		config.env.development.coreSource || config.coreSource;
+
 	await Promise.all( [
 		// Preemptively start the database while we wait for sources to download.
 		dockerCompose.upOne( 'mysql', {
@@ -75,37 +89,32 @@ module.exports = async function start( { spinner, debug } ) {
 		} ),
 
 		( async () => {
-			if ( config.coreSource ) {
-				await downloadSource( config.coreSource, {
+			if ( coreDevSource ) {
+				await downloadSource( coreDevSource, {
 					onProgress: getProgressSetter( 'core' ),
 					spinner,
 					debug: config.debug,
 				} );
-				await copyCoreFiles(
-					config.coreSource.path,
-					config.coreSource.testsPath
-				);
-
-				// Ensure the tests uploads folder is writeable for travis,
-				// creating the folder if necessary.
-				const testsUploadsPath = path.join(
-					config.coreSource.testsPath,
-					'wp-content/uploads'
-				);
-				await fs.mkdir( testsUploadsPath, { recursive: true } );
-				await fs.chmod( testsUploadsPath, 0o0767 );
+				if ( ! config.env.tests.coreSource ) {
+					await copyCoreFiles(
+						config.coreSource.path,
+						config.coreSource.testsPath
+					);
+				}
 			}
 		} )(),
 
-		...config.pluginSources.map( ( source ) =>
-			downloadSource( source, {
-				onProgress: getProgressSetter( source.basename ),
-				spinner,
-				debug: config.debug,
-			} )
-		),
+		( async () => {
+			if ( config.env.tests.coreSource ) {
+				await downloadSource( config.env.tests.coreSource, {
+					onProgress: getProgressSetter( 'core' ),
+					spinner,
+					debug: config.debug,
+				} );
+			}
+		} )(),
 
-		...config.themeSources.map( ( source ) =>
+		...sources.map( ( source ) =>
 			downloadSource( source, {
 				onProgress: getProgressSetter( source.basename ),
 				spinner,
@@ -113,6 +122,18 @@ module.exports = async function start( { spinner, debug } ) {
 			} )
 		),
 	] );
+
+	// Ensure the tests uploads folder is writeable for travis,
+	// creating the folder if necessary.
+	const testsUploadsPath = path.join(
+		config.env.tests.coreSource
+			? config.env.tests.coreSource.path
+			: config.coreSource.testsPath,
+		'wp-content/uploads'
+	);
+
+	await fs.mkdir( testsUploadsPath, { recursive: true } );
+	await fs.chmod( testsUploadsPath, 0o0767 );
 
 	spinner.text = 'Starting WordPress.';
 
