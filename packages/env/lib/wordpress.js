@@ -91,14 +91,6 @@ async function configureWordPress( environment, config ) {
 	);
 
 	// Set wp-config.php values.
-	// @TODO noahtallen
-	// for ( let [ key, value ] of Object.entries( config.config ) ) {
-	// 	// Ensure correct port setting from config when configure WP urls.
-	// 	if ( key === 'WP_SITEURL' || key === 'WP_HOME' ) {
-	// 		const url = new URL( value );
-	// 		url.port = port;
-	// 		value = url.toString();
-	// 	}
 	for ( const [ key, value ] of Object.entries( {
 		...config.config,
 		...config.env[ environment ].config,

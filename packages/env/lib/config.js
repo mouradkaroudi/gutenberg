@@ -92,6 +92,8 @@ module.exports = {
 				WP_DEBUG: true,
 				SCRIPT_DEBUG: true,
 				WP_TESTS_DOMAIN: 'localhost',
+				WP_SITEURL: 'localhost',
+				WP_HOME: 'localhost',
 			},
 			mappings: {},
 		};
@@ -100,9 +102,6 @@ module.exports = {
 		const defaultConfig = {
 			...defaultEnvConfig,
 			env: {
-				development: {
-					port: 8888,
-				},
 				tests: {
 					config: { WP_DEBUG: false, SCRIPT_DEBUG: false },
 					port: 8889,
@@ -251,14 +250,21 @@ function withOverrides( config ) {
 		getNumberFromEnvVariable( 'WP_ENV_TESTS_PORT' ) ||
 		config.env.tests.port;
 
-	// Set the WP_TESTS_DOMAIN port number based on the passed port.
-	const devUrl = new URL( config.env.development.config.WP_TESTS_DOMAIN );
-	devUrl.port = config.env.development.port;
-	config.env.development.config.WP_TESTS_DOMAIN = devUrl.toString();
+	const updateEnvUrl = (
+		configKey,
+		environments = [ 'development', 'tests' ]
+	) => {
+		environments.forEach( ( envKey ) => {
+			const baseUrl = new URL( config.env[ envKey ].config[ configKey ] );
+			baseUrl.port = config.env[ envKey ].port;
+			config.env[ envKey ].config[ configKey ] = baseUrl.toString();
+		} );
+	};
 
-	const testsUrl = new URL( config.env.tests.config.WP_TESTS_DOMAIN );
-	testsUrl.port = config.env.tests.port;
-	config.env.tests.config.WP_TESTS_DOMAIN = testsUrl.toString();
+	// Update wp config options to include the correct port number in the URL.
+	updateEnvUrl( 'WP_TESTS_DOMAIN' );
+	updateEnvUrl( 'WP_SITEURL' );
+	updateEnvUrl( 'WP_HOME' );
 
 	return config;
 }
