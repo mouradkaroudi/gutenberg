@@ -13,8 +13,15 @@ import {
 	ObserveTyping,
 	WritingFlow,
 } from '@wordpress/block-editor';
-import { Button, Panel, PanelBody, Popover } from '@wordpress/components';
-import { useSelect } from '@wordpress/data';
+import {
+	Button,
+	CheckboxControl,
+	Panel,
+	PanelBody,
+	Popover,
+} from '@wordpress/components';
+import { useDispatch, useSelect } from '@wordpress/data';
+import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 /**
@@ -46,6 +53,16 @@ export default function BlockEditorPanel( {
 		},
 		[]
 	);
+	const { saveMenu } = useDispatch( 'core' );
+	const menu = useSelect( ( select ) => select( 'core' ).getMenu( menuId ), [
+		menuId,
+	] );
+
+	const [ autoAddPages, setAutoAddPages ] = useState( menu.auto_add );
+
+	useEffect( () => {
+		setAutoAddPages( menu.auto_add );
+	}, [ menuId ] );
 
 	return (
 		<Panel className="edit-navigation-menu-editor__block-editor-panel">
@@ -72,6 +89,22 @@ export default function BlockEditorPanel( {
 						<BlockList />
 					</ObserveTyping>
 				</WritingFlow>
+				<CheckboxControl
+					label={ __(
+						'Automatically add new top-level pages to this menu'
+					) }
+					help={ __(
+						'New menu items will automatically appear in this menu as new top level pages are added to your site'
+					) }
+					onChange={ async () => {
+						setAutoAddPages( ! autoAddPages );
+						saveMenu( {
+							...menu,
+							auto_add: ! autoAddPages,
+						} );
+					} }
+					checked={ autoAddPages }
+				/>
 				<div className="components-panel__footer-actions">
 					<DeleteMenuButton
 						menuId={ menuId }
