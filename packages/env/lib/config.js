@@ -82,26 +82,60 @@ module.exports = {
 			md5( configPath )
 		);
 
-		// The default WPServiceConfig set for every environment.
-		const defaultEnvConfig = {
-			core: null,
-			plugins: [],
-			themes: [],
-			port: 8888,
-			config: {
-				WP_DEBUG: true,
-				SCRIPT_DEBUG: true,
-				WP_TESTS_DOMAIN: 'localhost',
-				WP_SITEURL: 'localhost',
-				WP_HOME: 'localhost',
-			},
-			mappings: {},
+		// The specified base configuration from .wp-env.json or from the local
+		// source type which was automatically detected.
+		const baseConfig =
+			( await getConfigFileData( '.wp-env.json', configPath ) ) ||
+			getDefaultBaseConfig();
+
+		// Overriden .wp-env.json on a per-user case.
+		const overrideConfig =
+			( await getConfigFileData(
+				'.wp-env.override.json',
+				configPath.replace( /\.wp-env\.json$/, '.wp-env.override.json' )
+			) ) || {};
+
+		// A handy merge function which lets us deep-merge the wp-config values
+		// instead of overwriting them. This is for merging environment
+		const mergeWpServiceConfigs = ( ...configs ) => {
+			// Returns an array of nested values in the config object. For example,
+			// an array of all the wp-config objects.
+			const getNestedValues = ( key, defaultValue = {} ) =>
+				configs.map( ( config ) => config[ key ] || defaultValue );
+
+			return {
+				...Object.assign( {}, ...configs ),
+				config: {
+					...Object.assign( {}, ...getNestedValues( 'config' ) ),
+				},
+			};
 		};
 
-		// Default configuration format which can be changed.
-		const defaultConfig = {
-			...defaultEnvConfig,
+		// Configuration applicable to all environments.
+		const defaultWpServiceConfig = mergeWpServiceConfigs(
+			{
+				core: null,
+				plugins: [],
+				themes: [],
+				port: 8888,
+				mappings: {},
+				config: {
+					WP_DEBUG: true,
+					SCRIPT_DEBUG: true,
+					WP_TESTS_DOMAIN: 'http://localhost',
+					WP_SITEURL: 'http://localhost',
+					WP_HOME: 'http://localhost',
+				},
+			},
+			baseConfig,
+			overrideConfig
+		);
+
+		// Configuration specific to each environment. Will be merged with any
+		// other specified environments.
+		const environmentDefaults = {
 			env: {
+				development: {}, // No overrides needed, but it should exist.
 				tests: {
 					config: { WP_DEBUG: false, SCRIPT_DEBUG: false },
 					port: 8889,
@@ -109,36 +143,13 @@ module.exports = {
 			},
 		};
 
-		// The specified configuration from .wp-env.json or from detecting the source type in cwd.
-		const baseConfig =
-			( await getConfigFileData( '.wp-env.json', configPath ) ) ||
-			getDefaultBaseConfig();
-
-		// Configuration to override on a per-user case.
-		const overrideConfig =
-			( await getConfigFileData(
-				'.wp-env.override.json',
-				configPath.replace( /\.wp-env\.json$/, '.wp-env.override.json' )
-			) ) || {};
-
-		// Base-level parsed configuration applicable to all environments with
-		// overrides applied in order.
-		const configAll = parseConfig(
-			{
-				...defaultEnvConfig,
-				...baseConfig,
-				...overrideConfig,
-			},
-			workDirectoryPath
-		);
-
 		// A unique array of the environments specified in the config options.
-		// Needed so that we can override items on a per-environment level, rather
-		// than completely overwriting each env.
+		// Needed so that we can override settings per-environment, rather than
+		// overwriting each environment key.
 		const getEnvKeys = ( config ) => Object.keys( config.env || {} );
 		const allEnvs = [
 			...new Set( [
-				...getEnvKeys( defaultConfig ),
+				...getEnvKeys( environmentDefaults ),
 				...getEnvKeys( baseConfig ),
 				...getEnvKeys( overrideConfig ),
 			] ),
@@ -147,14 +158,15 @@ module.exports = {
 		const getEnvConfig = ( config, envName ) =>
 			config.env && config.env[ envName ] ? config.env[ envName ] : {};
 
+		// Merge each of the specified environment-level overrides.
 		const env = allEnvs.reduce( ( result, envName ) => {
-			result[ envName ] = parseConfig(
-				{
-					...defaultEnvConfig,
-					...getEnvConfig( defaultConfig, envName ),
-					...getEnvConfig( baseConfig, envName ),
-					...getEnvConfig( overrideConfig, envName ),
-				},
+			result[ envName ] = validateConfig(
+				mergeWpServiceConfigs(
+					defaultWpServiceConfig,
+					getEnvConfig( environmentDefaults, envName ),
+					getEnvConfig( baseConfig, envName ),
+					getEnvConfig( overrideConfig, envName )
+				),
 				workDirectoryPath
 			);
 			return result;
@@ -168,7 +180,6 @@ module.exports = {
 			),
 			configDirectoryPath,
 			workDirectoryPath,
-			...configAll,
 			env,
 		} );
 	},
@@ -255,9 +266,17 @@ function withOverrides( config ) {
 		environments = [ 'development', 'tests' ]
 	) => {
 		environments.forEach( ( envKey ) => {
-			const baseUrl = new URL( config.env[ envKey ].config[ configKey ] );
-			baseUrl.port = config.env[ envKey ].port;
-			config.env[ envKey ].config[ configKey ] = baseUrl.toString();
+			try {
+				const baseUrl = new URL(
+					config.env[ envKey ].config[ configKey ]
+				);
+				baseUrl.port = config.env[ envKey ].port;
+				config.env[ envKey ].config[ configKey ] = baseUrl.toString();
+			} catch ( error ) {
+				throw new ValidationError(
+					`Invalid .wp-env.json: config.${ configKey } must be a valid URL.`
+				);
+			}
 		} );
 	};
 
@@ -276,7 +295,7 @@ function withOverrides( config ) {
  * @param {string} workDirectoryPath Absolute path to the environment work dir.
  * @return {Object} the validated and parsed config object.
  */
-function parseConfig( config, workDirectoryPath ) {
+function validateConfig( config, workDirectoryPath ) {
 	if ( config.core !== null && typeof config.core !== 'string' ) {
 		throw new ValidationError(
 			'Invalid .wp-env.json: "core" must be null or a string.'
