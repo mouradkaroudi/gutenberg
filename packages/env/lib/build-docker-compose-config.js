@@ -42,12 +42,10 @@ function getMounts( config ) {
  * @return {Object} A docker-compose config object, ready to serialize into YAML.
  */
 module.exports = function buildDockerComposeConfig( config ) {
-	const devCoreSource =
-		config.env.development.coreSource || config.coreSource;
+	const devCoreSource = config.env.development.coreSource;
 
 	const developmentMounts = [
 		`${ devCoreSource ? devCoreSource.path : 'wordpress' }:/var/www/html`,
-		...getMounts( config ),
 		...getMounts( config.env.development ),
 	];
 
@@ -95,14 +93,11 @@ module.exports = function buildDockerComposeConfig( config ) {
 								) }:/var/www/html/${ filename }`
 						)
 				: [] ),
-
-			...getMounts( config ),
 			...getMounts( config.env.tests ),
 		];
 	} else {
 		testsMounts = [
 			'tests-wordpress:/var/www/html',
-			...getMounts( config ),
 			...getMounts( config.env.tests ),
 		];
 	}

@@ -25,7 +25,7 @@ class ValidationError extends Error {}
 const HOME_PATH_PREFIX = `~${ path.sep }`;
 
 /**
- * Extra options on top of WPServiceConfig available for Config
+ * wp-env configuration.
  *
  * @typedef Config
  * @property {string}      name                     Name of the environment.
@@ -34,19 +34,10 @@ const HOME_PATH_PREFIX = `~${ path.sep }`;
  * @property {string}      dockerComposeConfigPath  Path to the docker-compose.yml file.
  * @property {Object.<string, WPServiceConfig>} env Specific config for different services.
  * @property {boolean}     debug                    True if debug mode is enabled.
- *
- * Pretend that the following types are "extended" from WPServiceConfig in a
- * world where JSDoc supports intersection or inheritance.
- * @property {Source|null} coreSource           The WordPress installation to load in the environment.
- * @property {Source[]}    pluginSources        Plugins to load in the environment.
- * @property {Source[]}    themeSources         Themes to load in the environment.
- * @property {number}      port                 The port on which to start the development WordPress environment.
- * @property {Object}      config               Mapping of wp-config.php constants to their desired values.
- * @property {Object.<string, Source>} mappings Mapping of WordPress directories to local directories which should be mounted.
  */
 
 /**
- * Base-level config for any particular service.
+ * Base-level config for any particular service. (development/tests/etc)
  *
  * @typedef WPServiceConfig
  * @property {Source|null} coreSource           The WordPress installation to load in the environment.

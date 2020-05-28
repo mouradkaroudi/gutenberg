@@ -69,11 +69,20 @@ module.exports = async function start( { spinner, debug } ) {
 
 	const sources = [];
 	const sourceKeys = [ 'pluginSources', 'themeSources' ];
-	// Adding config at the end lets us get more sources from the base config.
-	for ( const env in [ ...Object.values( config.env ), { ...config } ] ) {
+	for ( const env in [ ...Object.values( config.env ) ] ) {
 		sourceKeys.forEach( ( sourceKey ) => {
-			if ( env[ sourceKey ] ) {
-				sources.push( env[ sourceKey ] );
+			if ( Array.isArray( env[ sourceKey ] ) ) {
+				// Add source if it has not yet been added to avoid dupliacte downloads.
+				env[ sourceKey ].forEach( ( source ) => {
+					if (
+						! sources.find(
+							( { path: sourcePath } ) =>
+								sourcePath === source.path
+						)
+					) {
+						sources.push( source );
+					}
+				} );
 			}
 		} );
 	}
