@@ -52,9 +52,12 @@ const HOME_PATH_PREFIX = `~${ path.sep }`;
  * A WordPress installation, plugin or theme to be loaded into the environment.
  *
  * @typedef Source
- * @property {string} type The source type. Can be 'local' or 'git'.
- * @property {string} path The path to the WordPress installation, plugin or theme.
- * @property {string} basename Name that identifies the WordPress installation, plugin or theme.
+ * @property {string}   type                The source type. Can be 'local', 'git', or 'zip.
+ * @property {string}   path                The path to the WordPress installation, plugin or theme.
+ * @property {string?}  url                 The URL to the source download if the source type is not local.
+ * @property {string?}  ref                 The git ref for the source if the source type is 'git'.
+ * @property {string}   basename            Name that identifies the WordPress installation, plugin or theme.
+ * @property {boolean?} makeEnvironmentCopies If true, make a copy of the download for each environment.
  */
 
 module.exports = {
@@ -150,15 +153,18 @@ module.exports = {
 			config.env && config.env[ envName ] ? config.env[ envName ] : {};
 
 		// Merge each of the specified environment-level overrides.
-		const env = allEnvs.reduce( ( result, envName ) => {
-			result[ envName ] = validateConfig(
+		const env = allEnvs.reduce( ( result, environment ) => {
+			result[ environment ] = validateConfig(
 				mergeWpServiceConfigs(
 					defaultWpServiceConfig,
-					getEnvConfig( environmentDefaults, envName ),
-					getEnvConfig( baseConfig, envName ),
-					getEnvConfig( overrideConfig, envName )
+					getEnvConfig( environmentDefaults, environment ),
+					getEnvConfig( baseConfig, environment ),
+					getEnvConfig( overrideConfig, environment )
 				),
-				workDirectoryPath
+				{
+					workDirectoryPath,
+					environment,
+				}
 			);
 			return result;
 		}, {} );
@@ -283,10 +289,12 @@ function withOverrides( config ) {
  * Parses and validates a config object.
  *
  * @param {Object} config A raw config object to parse
- * @param {string} workDirectoryPath Absolute path to the environment work dir.
- * @return {Object} the validated and parsed config object.
+ * @param {Object} options
+ * @param {string} options.workDirectoryPath Path to the work directory located in ~/.wp-env.
+ * @param {string} options.environment Environment name for the service we are parsing.
+ * @return {WPServiceConfig} validated and parsed service-level configuration.
  */
-function validateConfig( config, workDirectoryPath ) {
+function validateConfig( config, options ) {
 	if ( config.core !== null && typeof config.core !== 'string' ) {
 		throw new ValidationError(
 			'Invalid .wp-env.json: "core" must be null or a string.'
@@ -339,27 +347,20 @@ function validateConfig( config, workDirectoryPath ) {
 
 	return {
 		port: config.port,
-		coreSource: copyFileToEnvs(
-			parseSourceString( config.core, {
-				workDirectoryPath,
-			} )
+		coreSource: includeEnvCopy(
+			parseSourceString( config.core, options ),
+			options
 		),
 		pluginSources: config.plugins.map( ( sourceString ) =>
-			parseSourceString( sourceString, {
-				workDirectoryPath,
-			} )
+			parseSourceString( sourceString, options )
 		),
 		themeSources: config.themes.map( ( sourceString ) =>
-			parseSourceString( sourceString, {
-				workDirectoryPath,
-			} )
+			parseSourceString( sourceString, options )
 		),
 		config: config.config,
 		mappings: Object.entries( config.mappings ).reduce(
 			( result, [ wpDir, localDir ] ) => {
-				const source = parseSourceString( localDir, {
-					workDirectoryPath,
-				} );
+				const source = parseSourceString( localDir, options );
 				result[ wpDir ] = source;
 				return result;
 			},
@@ -373,7 +374,6 @@ function validateConfig( config, workDirectoryPath ) {
  *
  * @param {string|null} sourceString The source string. See README.md for documentation on valid source string patterns.
  * @param {Object} options
- * @param {boolean} options.hasTests Whether or not a `testsPath` is required. Only the 'core' source needs this.
  * @param {string} options.workDirectoryPath Path to the work directory located in ~/.wp-env.
  * @return {Source|null} A source object.
  */
@@ -440,20 +440,32 @@ function parseSourceString( sourceString, { workDirectoryPath } ) {
 }
 
 /**
- * Given a source object, returns a new source object.
+ * Given a source object, returns a new source object which specifies that a
+ * copy of the source should be made for the given environment. It additionally
+ * creates the correct path for the copy location.
  *
- * @param {Source|null} source A source object.
- *
+ * @param {Source} source The source object to mark for copy.
+ * @param {Object} options
+ * @param {string} options.workDirectoryPath Path to the work directory located in ~/.wp-env.
+ * @param {string} options.environment       Environment name for the service we are parsing.
  * @return {Source|null} A source object.
  */
-function copyFileToEnvs( source ) {
+function includeEnvCopy( source, { workDirectoryPath, environment } ) {
 	if ( source === null ) {
 		return null;
 	}
 
+	// Development paths don't need overridden.
+	const shouldUseEnvPath = environment && environment !== 'development';
 	return {
 		...source,
-		copyFilesToEnvs: true,
+		path: shouldUseEnvPath
+			? path.resolve(
+					workDirectoryPath,
+					environment + '-' + path.basename( source.path )
+			  )
+			: source.path,
+		makeEnvironmentCopies: true,
 	};
 }
 
@@ -519,5 +531,8 @@ async function getHomeDirectory() {
  * @return {string} An MD5 hash string.
  */
 function md5( data ) {
-	return crypto.createHash( 'md5' ).update( data ).digest( 'hex' );
+	return crypto
+		.createHash( 'md5' )
+		.update( data )
+		.digest( 'hex' );
 }

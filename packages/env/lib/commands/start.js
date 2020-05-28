@@ -24,7 +24,6 @@ const {
 	checkDatabaseConnection,
 	makeContentDirectoriesWritable,
 	configureWordPress,
-	copyCoreFiles,
 } = require( '../wordpress' );
 
 /**
@@ -70,9 +69,7 @@ module.exports = async function start( { spinner, debug } ) {
 	// Ensure the tests uploads folder is writeable for travis,
 	// creating the folder if necessary.
 	const testsUploadsPath = path.join(
-		config.env.tests.coreSource
-			? config.env.tests.coreSource.path
-			: config.coreSource.testsPath,
+		config.env.tests.coreSource.path,
 		'wp-content/uploads'
 	);
 
@@ -126,7 +123,7 @@ module.exports = async function start( { spinner, debug } ) {
  * @param {Object} spinner The spinner object to show progress.
  * @return {Promise[]} An array of promises for the downlad tasks.
  */
-function downloadSources( config, spinner ) {
+async function downloadSources( config, spinner ) {
 	const progresses = {};
 	const getProgressSetter = ( id ) => ( progress ) => {
 		progresses[ id ] = progress;
@@ -141,13 +138,23 @@ function downloadSources( config, spinner ) {
 	};
 
 	const sources = [];
-	const addedSources = {};
+	// A map of locations each download needs to be copied to.
+	const copyLocations = {};
 	const addSource = ( source ) => {
-		if ( source.url && ! addedSources[ source.url ] ) {
+		if ( source.url && ! copyLocations[ source.url ] ) {
 			sources.push( source );
-			addedSources[ source.url ] = true;
+			copyLocations[ source.url ] = [];
+		} else if (
+			copyLocations[ source.url ] &&
+			source.makeEnvironmentCopies
+		) {
+			// If the source has already been added, and if the soure should be
+			// copied to each environment separately, add this environment path
+			// as a target copy. It does not need to be downloaded again, though.
+			copyLocations[ source.url ].push( source.path );
 		}
 	};
+
 	for ( const env in Object.values( config.env ) ) {
 		[ 'pluginSources', 'themeSources', 'coreSource' ].forEach(
 			( sourceKey ) => {
@@ -161,12 +168,14 @@ function downloadSources( config, spinner ) {
 		);
 	}
 
-	return sources.map( ( source ) =>
-		downloadSource( source, {
-			onProgress: getProgressSetter( source.basename ),
-			spinner,
-			debug: config.debug,
-		} )
+	await Promise.all(
+		sources.map( ( source ) =>
+			downloadSource( source, copyLocations[ source.url ], {
+				onProgress: getProgressSetter( source.basename ),
+				spinner,
+				config,
+			} )
+		)
 	);
 }
 
