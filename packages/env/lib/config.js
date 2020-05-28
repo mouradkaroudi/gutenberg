@@ -339,11 +339,10 @@ function validateConfig( config, workDirectoryPath ) {
 
 	return {
 		port: config.port,
-		coreSource: includeTestsPath(
+		coreSource: copyFileToEnvs(
 			parseSourceString( config.core, {
 				workDirectoryPath,
-			} ),
-			{ workDirectoryPath }
+			} )
 		),
 		pluginSources: config.plugins.map( ( sourceString ) =>
 			parseSourceString( sourceString, {
@@ -441,25 +440,20 @@ function parseSourceString( sourceString, { workDirectoryPath } ) {
 }
 
 /**
- * Given a source object, returns a new source object with the testsPath
- * property set correctly. Only the 'core' source requires a testsPath.
+ * Given a source object, returns a new source object.
  *
  * @param {Source|null} source A source object.
- * @param {Object} options
- * @param {string} options.workDirectoryPath Path to the work directory located in ~/.wp-env.
+ *
  * @return {Source|null} A source object.
  */
-function includeTestsPath( source, { workDirectoryPath } ) {
+function copyFileToEnvs( source ) {
 	if ( source === null ) {
 		return null;
 	}
 
 	return {
 		...source,
-		testsPath: path.resolve(
-			workDirectoryPath,
-			'tests-' + path.basename( source.path )
-		),
+		copyFilesToEnvs: true,
 	};
 }
 

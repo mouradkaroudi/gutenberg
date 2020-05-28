@@ -26,6 +26,8 @@ const copyDir = util.promisify( require( 'copy-dir' ) );
  *
  * @param {Source}   source             The source to download.
  * @param {Object}   options
+ * @param {Function} options.workDirectoryPath The wp-env work directory.
+ * @param {Function} options.environments A list of non-dev environments in the wp-env config to copy the source to.
  * @param {Function} options.onProgress A function called with download progress. Will be invoked with one argument: a number that ranges from 0 to 1 which indicates current download progress for this source.
  * @param {Object}   options.spinner    A CLI spinner which indicates progress.
  * @param {boolean}  options.debug      True if debug mode is enabled.
@@ -36,7 +38,43 @@ module.exports = async function downloadSource( source, options ) {
 	} else if ( source.type === 'zip' ) {
 		await downloadZipSource( source, options );
 	}
+	if ( source.copyFilesToEnvs ) {
+		for ( const env in options.environments ) {
+			const newLocation = path.resolve(
+				options.workDirectoryPath,
+				env + '-' + path.basename( source.path )
+			);
+			await copySource( source.path, newLocation );
+		}
+	}
 };
+
+/**
+ * Copies a WordPress installation, taking care to ignore large directories
+ * (.git, node_modules) and configuration files (wp-config.php).
+ *
+ * @param {string} fromPath Path to the WordPress directory to copy.
+ * @param {string} toPath Destination path.
+ */
+async function copySource( fromPath, toPath ) {
+	await copyDir( fromPath, toPath, {
+		filter( stat, filepath, filename ) {
+			if ( stat === 'symbolicLink' ) {
+				return false;
+			}
+			if ( stat === 'directory' && filename === '.git' ) {
+				return false;
+			}
+			if ( stat === 'directory' && filename === 'node_modules' ) {
+				return false;
+			}
+			if ( stat === 'file' && filename === 'wp-config.php' ) {
+				return false;
+			}
+			return true;
+		},
+	} );
+}
 
 /**
  * Clones the git repository at `source.url` into `source.path`. If the

@@ -156,37 +156,9 @@ async function resetDatabase(
 	await Promise.all( tasks );
 }
 
-/**
- * Copies a WordPress installation, taking care to ignore large directories
- * (.git, node_modules) and configuration files (wp-config.php).
- *
- * @param {string} fromPath Path to the WordPress directory to copy.
- * @param {string} toPath Destination path.
- */
-async function copyCoreFiles( fromPath, toPath ) {
-	await copyDir( fromPath, toPath, {
-		filter( stat, filepath, filename ) {
-			if ( stat === 'symbolicLink' ) {
-				return false;
-			}
-			if ( stat === 'directory' && filename === '.git' ) {
-				return false;
-			}
-			if ( stat === 'directory' && filename === 'node_modules' ) {
-				return false;
-			}
-			if ( stat === 'file' && filename === 'wp-config.php' ) {
-				return false;
-			}
-			return true;
-		},
-	} );
-}
-
 module.exports = {
 	makeContentDirectoriesWritable,
 	checkDatabaseConnection,
 	configureWordPress,
 	resetDatabase,
-	copyCoreFiles,
 };

@@ -28,6 +28,10 @@ const {
 } = require( '../wordpress' );
 
 /**
+ * @typedef {import('../config').Config} Config
+ */
+
+/**
  * Starts the development server.
  *
  * @param {Object}  options
@@ -54,82 +58,13 @@ module.exports = async function start( { spinner, debug } ) {
 
 	spinner.text = 'Downloading WordPress.';
 
-	const progresses = {};
-	const getProgressSetter = ( id ) => ( progress ) => {
-		progresses[ id ] = progress;
-		spinner.text =
-			'Downloading WordPress.\n' +
-			Object.entries( progresses )
-				.map(
-					( [ key, value ] ) =>
-						`  - ${ key }: ${ ( value * 100 ).toFixed( 0 ) }/100%`
-				)
-				.join( '\n' );
-	};
-
-	const sources = [];
-	const sourceKeys = [ 'pluginSources', 'themeSources' ];
-	for ( const env in [ ...Object.values( config.env ) ] ) {
-		sourceKeys.forEach( ( sourceKey ) => {
-			if ( Array.isArray( env[ sourceKey ] ) ) {
-				// Add source if it has not yet been added to avoid dupliacte downloads.
-				env[ sourceKey ].forEach( ( source ) => {
-					if (
-						! sources.find(
-							( { path: sourcePath } ) =>
-								sourcePath === source.path
-						)
-					) {
-						sources.push( source );
-					}
-				} );
-			}
-		} );
-	}
-
-	const coreDevSource =
-		config.env.development.coreSource || config.coreSource;
-
 	await Promise.all( [
 		// Preemptively start the database while we wait for sources to download.
 		dockerCompose.upOne( 'mysql', {
 			config: config.dockerComposeConfigPath,
 			log: config.debug,
 		} ),
-
-		( async () => {
-			if ( coreDevSource ) {
-				await downloadSource( coreDevSource, {
-					onProgress: getProgressSetter( 'core' ),
-					spinner,
-					debug: config.debug,
-				} );
-				if ( ! config.env.tests.coreSource ) {
-					await copyCoreFiles(
-						config.coreSource.path,
-						config.coreSource.testsPath
-					);
-				}
-			}
-		} )(),
-
-		( async () => {
-			if ( config.env.tests.coreSource ) {
-				await downloadSource( config.env.tests.coreSource, {
-					onProgress: getProgressSetter( 'core' ),
-					spinner,
-					debug: config.debug,
-				} );
-			}
-		} )(),
-
-		...sources.map( ( source ) =>
-			downloadSource( source, {
-				onProgress: getProgressSetter( source.basename ),
-				spinner,
-				debug: config.debug,
-			} )
-		),
+		...downloadSources( config, spinner ),
 	] );
 
 	// Ensure the tests uploads folder is writeable for travis,
@@ -182,6 +117,58 @@ module.exports = async function start( { spinner, debug } ) {
 
 	spinner.text = 'WordPress started.';
 };
+
+/**
+ * Download each source for each environment. If the same source is used in multiple
+ * environments, it will only be downloaded once.
+ *
+ * @param {Config} config The wp-env configuration object.
+ * @param {Object} spinner The spinner object to show progress.
+ * @return {Promise[]} An array of promises for the downlad tasks.
+ */
+function downloadSources( config, spinner ) {
+	const progresses = {};
+	const getProgressSetter = ( id ) => ( progress ) => {
+		progresses[ id ] = progress;
+		spinner.text =
+			'Downloading WordPress.\n' +
+			Object.entries( progresses )
+				.map(
+					( [ key, value ] ) =>
+						`  - ${ key }: ${ ( value * 100 ).toFixed( 0 ) }/100%`
+				)
+				.join( '\n' );
+	};
+
+	const sources = [];
+	const addedSources = {};
+	const addSource = ( source ) => {
+		if ( source.url && ! addedSources[ source.url ] ) {
+			sources.push( source );
+			addedSources[ source.url ] = true;
+		}
+	};
+	for ( const env in Object.values( config.env ) ) {
+		[ 'pluginSources', 'themeSources', 'coreSource' ].forEach(
+			( sourceKey ) => {
+				if ( Array.isArray( env[ sourceKey ] ) ) {
+					env[ sourceKey ].forEach( addSource );
+				} else if ( typeof env[ sourceKey ] === 'object' ) {
+					// coreSource is not an array.
+					addSource( env[ sourceKey ] );
+				}
+			}
+		);
+	}
+
+	return sources.map( ( source ) =>
+		downloadSource( source, {
+			onProgress: getProgressSetter( source.basename ),
+			spinner,
+			debug: config.debug,
+		} )
+	);
+}
 
 /**
  * Checks for legacy installs and provides
