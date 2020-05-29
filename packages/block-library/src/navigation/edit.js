@@ -65,6 +65,7 @@ function Navigation( {
 	className,
 } ) {
 	const CREATE_EMPTY_OPTION_VALUE = '__CREATE_EMPTY__';
+	const CREATE_FROM_PAGES_OPTION_VALUE = '__CREATE_FROM_PAGES__';
 
 	//
 	// HOOKS
@@ -208,7 +209,7 @@ function Navigation( {
 			? [
 					{
 						key: '',
-						name: __( 'Select Menu…' ),
+						name: __( 'Select where to start from…' ),
 					},
 					...menus,
 					{
@@ -218,18 +219,38 @@ function Navigation( {
 					},
 					{
 						key: CREATE_EMPTY_OPTION_VALUE,
-						name: __( 'Create Empty' ),
+						name: __( 'Create empty menu' ),
 					},
+					...( hasPages
+						? [
+								{
+									key: CREATE_FROM_PAGES_OPTION_VALUE,
+									name: __(
+										'Create from all top-level pages'
+									),
+								},
+						  ]
+						: [] ),
 			  ]
 			: [
 					{
 						key: '',
-						name: __( 'Select Menu…' ),
+						name: __( 'Select where to start from…' ),
 					},
 					{
 						key: CREATE_EMPTY_OPTION_VALUE,
-						name: __( 'Create Empty' ),
+						name: __( 'Create empty menu' ),
 					},
+					...( hasPages
+						? [
+								{
+									key: CREATE_FROM_PAGES_OPTION_VALUE,
+									name: __(
+										'Create from all top-level pages'
+									),
+								},
+						  ]
+						: [] ),
 			  ];
 
 	// If we don't have existing items or the User hasn't
@@ -287,7 +308,7 @@ function Navigation( {
 									} }
 									disabled={ ! selectedMenu }
 								>
-									{ __( 'Create from Menu' ) }
+									{ __( 'Create' ) }
 								</Button>
 							</>
 						) }
