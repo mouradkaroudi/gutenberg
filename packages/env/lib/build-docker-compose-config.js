@@ -31,7 +31,11 @@ function getMounts( config ) {
 		( source ) =>
 			`${ source.path }:/var/www/html/wp-content/themes/${ source.basename }`
 	);
-	return [ ...directoryMounts, ...pluginMounts, ...themeMounts ];
+	const coreMount = `${
+		config.coreSource ? config.coreSource.path : 'wordpress'
+	}:/var/www/html`;
+
+	return [ coreMount, ...directoryMounts, ...pluginMounts, ...themeMounts ];
 }
 
 /**
@@ -42,18 +46,10 @@ function getMounts( config ) {
  * @return {Object} A docker-compose config object, ready to serialize into YAML.
  */
 module.exports = function buildDockerComposeConfig( config ) {
-	const devCoreSource = config.env.development.coreSource;
-
-	const developmentMounts = [
-		`${ devCoreSource ? devCoreSource.path : 'wordpress' }:/var/www/html`,
-		...getMounts( config.env.development ),
-	];
-
-	const testsCoreSourcePath =
-		config.env.tests.coreSource || config.coreSource;
+	const developmentMounts = getMounts( config.env.development );
 
 	let testsMounts;
-	if ( testsCoreSourcePath ) {
+	if ( config.coreSource.testsPath ) {
 		testsMounts = [
 			`${ config.coreSource.testsPath }:/var/www/html`,
 
