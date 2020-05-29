@@ -4,6 +4,7 @@
 import {
 	editEntityRecord,
 	saveEntityRecord,
+	deleteEntityRecord,
 	receiveEntityRecords,
 	receiveUserPermission,
 	receiveAutosaves,
@@ -26,6 +27,37 @@ describe( 'editEntityRecord', () => {
 		// Don't pass back an entity config.
 		expect( fulfillment.next.bind( fulfillment ) ).toThrow(
 			`The entity being edited (${ entity.kind }, ${ entity.name }) does not have a loaded config.`
+		);
+	} );
+} );
+
+describe( 'deleteEntityRecord', () => {
+	it( 'triggers a DELETE request for an existing record', async () => {
+		const post = 10;
+		const entities = [
+			{ name: 'post', kind: 'postType', baseURL: '/wp/v2/posts' },
+		];
+		const fulfillment = deleteEntityRecord( 'postType', 'post', post );
+		fulfillment.next();
+
+		// delete start action
+		expect( fulfillment.next( entities ).value.type ).toBe(
+			'DELETE_ENTITY_RECORD_START'
+		);
+
+		// remove items
+		fulfillment.next();
+
+		// delete api call
+		const { value: apiFetchAction } = fulfillment.next();
+		expect( apiFetchAction.request ).toEqual( {
+			path: '/wp/v2/posts/10',
+			method: 'DELETE',
+		} );
+
+		// delete finish
+		expect( fulfillment.next().value.type ).toBe(
+			'DELETE_ENTITY_RECORD_FINISH'
 		);
 	} );
 } );

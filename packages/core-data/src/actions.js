@@ -6,7 +6,7 @@ import { castArray, get, isEqual, find } from 'lodash';
 /**
  * Internal dependencies
  */
-import { receiveItems, receiveQueriedItems } from './queried-data';
+import { receiveItems, removeItems, receiveQueriedItems } from './queried-data';
 import { getKindEntities, DEFAULT_ENTITY_KEY } from './entities';
 import { select, apiFetch } from './controls';
 
@@ -136,6 +136,70 @@ export function receiveEmbedPreview( url, preview ) {
 		type: 'RECEIVE_EMBED_PREVIEW',
 		url,
 		preview,
+	};
+}
+
+/**
+ * Action triggered to delete an entity record.
+ *
+ * @param {string} kind      Kind of the deleted entity.
+ * @param {string} name      Name of the deleted entity.
+ * @param {Object} recordId  Record to be deleted.
+ */
+export function* deleteEntityRecord( kind, name, recordId ) {
+	const entities = yield getKindEntities( kind );
+	const entity = find( entities, { kind, name } );
+	if ( ! entity ) {
+		return;
+	}
+
+	yield {
+		type: 'DELETE_ENTITY_RECORD_START',
+		kind,
+		name,
+		recordId,
+	};
+
+	yield removeItems( kind, name, Number( recordId ) );
+
+	let error;
+
+	try {
+		let path = `${ entity.baseURL }/${ recordId }`;
+
+		if ( entity.forceDelete ) {
+			path += '?force=true';
+		}
+
+		yield apiFetch( {
+			path,
+			method: 'DELETE',
+		} );
+	} catch ( _error ) {
+		error = _error;
+
+		const persistedRecord = yield select(
+			'getEntityRecord',
+			kind,
+			name,
+			recordId
+		);
+
+		yield receiveEntityRecords(
+			kind,
+			name,
+			persistedRecord,
+			undefined,
+			false
+		);
+	}
+
+	yield {
+		type: 'DELETE_ENTITY_RECORD_FINISH',
+		kind,
+		name,
+		recordId,
+		error,
 	};
 }
 

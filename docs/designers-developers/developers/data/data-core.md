@@ -471,6 +471,16 @@ _Returns_
 
 -   `Object`: Action object.
 
+<a name="deleteEntityRecord" href="#deleteEntityRecord">#</a> **deleteEntityRecord**
+
+Action triggered to delete an entity record.
+
+_Parameters_
+
+-   _kind_ `string`: Kind of the deleted entity.
+-   _name_ `string`: Name of the deleted entity.
+-   _recordId_ `Object`: Record to be deleted.
+
 <a name="editEntityRecord" href="#editEntityRecord">#</a> **editEntityRecord**
 
 Returns an action object that triggers an
