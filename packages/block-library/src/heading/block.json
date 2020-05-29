@@ -24,7 +24,9 @@
 		"anchor": true,
 		"__unstablePasteTextInline": true,
 		"lightBlockWrapper": true,
-		"__experimentalColor": true,
+		"__experimentalColor": {
+			"linkColor": true
+		},
 		"__experimentalLineHeight": true,
 		"__experimentalFontSize": true
 	}

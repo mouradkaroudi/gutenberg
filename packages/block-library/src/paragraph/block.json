@@ -30,7 +30,10 @@
 		"className": false,
 		"__unstablePasteTextInline": true,
 		"lightBlockWrapper": true,
-		"__experimentalColor": true,
+		"__experimentalColor": {
+			"linkColor": true
+		},
+		"__experimentalLinkColor": true,
 		"__experimentalLineHeight": true,
 		"__experimentalFontSize": true,
 		"__experimentalFeatures": {

@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { has, get } from 'lodash';
+import { has, get, startsWith, reduce, merge } from 'lodash';
 
 /**
  * WordPress dependencies
@@ -11,7 +11,13 @@ import { hasBlockSupport } from '@wordpress/blocks';
 import { createHigherOrderComponent } from '@wordpress/compose';
 import { PanelBody } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
-import { Platform } from '@wordpress/element';
+import {
+	Platform,
+	createContext,
+	useContext,
+	useMemo,
+} from '@wordpress/element';
+import { useSelect } from '@wordpress/data';
 
 /**
  * Internal dependencies
@@ -35,6 +41,20 @@ const typographySupportKeys = [
 const hasStyleSupport = ( blockType ) =>
 	styleSupportKeys.some( ( key ) => hasBlockSupport( blockType, key ) );
 
+const VARIABLE_REFERENCE_PREFIX = 'var:';
+const VARIABLE_PATH_SEPARATOR_TOKEN_ATTRIBUTE = '|';
+const VARIABLE_PATH_SEPARATOR_TOKEN_STYLE = '--';
+function compileStyleValue( uncompiledValue ) {
+	if ( startsWith( uncompiledValue, VARIABLE_REFERENCE_PREFIX ) ) {
+		const variable = uncompiledValue
+			.slice( VARIABLE_REFERENCE_PREFIX.length )
+			.split( VARIABLE_PATH_SEPARATOR_TOKEN_ATTRIBUTE )
+			.join( VARIABLE_PATH_SEPARATOR_TOKEN_STYLE );
+		return `var(--wp--${ variable })`;
+	}
+	return uncompiledValue;
+}
+
 /**
  * Returns the inline styles to add depending on the style object
  *
@@ -48,12 +68,13 @@ export function getInlineStyles( styles = {} ) {
 		background: [ 'color', 'gradient' ],
 		backgroundColor: [ 'color', 'background' ],
 		color: [ 'color', 'text' ],
+		'--wp--color--link': [ 'color', 'link' ],
 	};
 
 	const output = {};
 	Object.entries( mappings ).forEach( ( [ styleKey, objectKey ] ) => {
 		if ( has( styles, objectKey ) ) {
-			output[ styleKey ] = get( styles, objectKey );
+			output[ styleKey ] = compileStyleValue( get( styles, objectKey ) );
 		}
 	} );
 
@@ -130,6 +151,18 @@ export function addEditProps( settings ) {
 	return settings;
 }
 
+const GlobalStylesContext = createContext( {} );
+
+// Todo: Move this specification to the block.json
+const selectorMapping = {
+	'core/heading/h1': ( { level } ) => level === 1,
+	'core/heading/h2': ( { level } ) => level === 2,
+	'core/heading/h3': ( { level } ) => level === 3,
+	'core/heading/h4': ( { level } ) => level === 4,
+	'core/heading/h5': ( { level } ) => level === 5,
+	'core/heading/h6': ( { level } ) => level === 6,
+};
+
 /**
  * Override the default edit UI to include new inspector controls for
  * all the custom styles configs.
@@ -144,18 +177,59 @@ export const withBlockControls = createHigherOrderComponent(
 			hasBlockSupport( blockName, key )
 		);
 
-		return [
-			Platform.OS === 'web' && hasTypographySupport && (
-				<InspectorControls key="typography">
-					<PanelBody title={ __( 'Typography' ) }>
-						<FontSizeEdit { ...props } />
-						<LineHeightEdit { ...props } />
-					</PanelBody>
-				</InspectorControls>
-			),
-			<ColorEdit key="colors" { ...props } />,
-			<BlockEdit key="edit" { ...props } />,
-		];
+		const { __experimentalGlobalStyles } = useSelect( ( select ) => {
+			return select( 'core/block-editor' ).getSettings();
+		}, [] );
+		const globalStylesContext = useContext( GlobalStylesContext );
+
+		const globalStylesBlock = useMemo( () => {
+			const globalBlockSpecificStyles = reduce(
+				__experimentalGlobalStyles,
+				( accumulator, value, selector ) => {
+					if (
+						selector === blockName ||
+						( selector.startsWith( blockName ) &&
+							selectorMapping[ selector ]( props.attributes ) )
+					) {
+						return merge( accumulator, value.styles );
+					}
+					return accumulator;
+				},
+				{}
+			);
+
+			// The styles are merged according the following priority:
+			// First: Local block styles.
+			// Second: Styles targeting the block specifically.
+			// Third: Styles inherited from the parent blocks.
+			// Forth: The global styles applied to the root.
+			return merge(
+				{},
+				__experimentalGlobalStyles?.global?.styles || {},
+				globalStylesContext || {},
+				globalBlockSpecificStyles,
+				props.attributes.style || {}
+			);
+		} );
+
+		return (
+			<GlobalStylesContext.Provider value={ globalStylesBlock }>
+				{ Platform.OS === 'web' && hasTypographySupport && (
+					<InspectorControls key="typography">
+						<PanelBody title={ __( 'Typography' ) }>
+							<FontSizeEdit { ...props } />
+							<LineHeightEdit { ...props } />
+						</PanelBody>
+					</InspectorControls>
+				) }
+				<ColorEdit
+					key="colors"
+					globalStyles={ globalStylesBlock }
+					{ ...props }
+				/>
+				<BlockEdit key="edit" { ...props } />
+			</GlobalStylesContext.Provider>
+		);
 	},
 	'withToolbarControls'
 );

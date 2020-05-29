@@ -121,6 +121,7 @@ class EditorProvider extends Component {
 				'__experimentalEnableFullSiteEditingDemo',
 				'__experimentalFeatures',
 				'__experimentalGlobalStylesUserEntityId',
+				'__experimentalGlobalStyles',
 				'__experimentalGlobalStylesBase',
 				'__experimentalPreferredStyleVariations',
 				'alignWide',
