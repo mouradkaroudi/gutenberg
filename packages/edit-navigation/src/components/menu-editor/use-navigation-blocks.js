@@ -37,9 +37,8 @@ export default function useNavigationBlocks( menuId ) {
 		[ menuId ]
 	);
 
-	const { saveMenuItem, deleteMenuItem } = useDispatch( 'core' );
+	const { saveMenuItem } = useDispatch( 'core' );
 	const { createSuccessNotice } = useDispatch( 'core/notices' );
-
 	const [ blocks, setBlocks ] = useState( [] );
 
 	const menuItemsRef = useRef( {} );
@@ -123,31 +122,15 @@ export default function useNavigationBlocks( menuId ) {
 
 		saveNestedBlocks( innerBlocks, parentItemId );
 
-		const getCurrentMenuItemBlocks = (
-			currentBlocks,
-			currentBlockList
-		) => {
-			currentBlocks.forEach( ( block ) => {
-				currentBlockList.push( block.clientId );
-				getCurrentMenuItemBlocks( block.innerBlocks, currentBlockList );
-			} );
-			return currentBlockList;
-		};
-
-		let currentBlockClientIds = [];
-		currentBlockClientIds = getCurrentMenuItemBlocks(
-			innerBlocks,
-			currentBlockClientIds
-		);
-
 		const deletedClientIds = difference(
 			Object.keys( menuItemsRef.current ),
-			currentBlockClientIds
+			innerBlocks.map( ( block ) => block.clientId )
 		);
 
+		// Disable reason, this code will eventually be implemented.
+		// eslint-disable-next-line no-unused-vars
 		for ( const deletedClientId of deletedClientIds ) {
-			const menuItem = menuItemsRef.current[ deletedClientId ];
-			deleteMenuItem( menuItem.id );
+			// TODO - delete menu items.
 		}
 
 		createSuccessNotice( __( 'Navigation saved.' ), {
