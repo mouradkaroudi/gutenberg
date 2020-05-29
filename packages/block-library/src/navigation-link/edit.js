@@ -261,7 +261,9 @@ function NavigationLinkEdit( {
 									id,
 								} = {} ) =>
 									setAttributes( {
-										url: encodeURI( newURL ),
+										url: ( () => {
+											return encodeURI( newURL );
+										} )(),
 										label: ( () => {
 											const normalizedTitle = newTitle.replace(
 												/http(s?):\/\//gi,
@@ -285,7 +287,7 @@ function NavigationLinkEdit( {
 											return escape( normalizedURL );
 										} )(),
 										opensInNewTab: newOpensInNewTab,
-										id,
+										id: id ? Number( id ) : undefined,
 									} )
 								}
 							/>

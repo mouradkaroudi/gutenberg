@@ -182,6 +182,22 @@ function render_block_core_navigation( $content, $block ) {
 }
 
 /**
+ * Returns the link for the one nav iteem or false
+ *
+ * @param array $attrs    The Navigation Link block attributes.
+ *
+ * @return string|bool Returns the determined link or false.
+ */
+function get_navigation_link_url( $attrs ) {
+	if ( isset( $attrs['id'] ) ) {
+		return esc_url( get_permalink( $attrs['id'] ) );
+	} elseif ( isset( $attrs['url'] ) ) {
+		return esc_url( $attrs['url'] );
+	}
+	return false;
+}
+
+/**
  * Walks the inner block structure and returns an HTML list for it.
  *
  * @param array $attributes    The Navigation block attributes.
@@ -213,16 +229,22 @@ function block_core_navigation_build_html( $attributes, $block, $colors, $font_s
 			$css_classes .= ' ' . $class_name;
 		};
 
+		$item_url = get_navigation_link_url( $block['attrs'] );
+		$item_tag = $item_url ? 'a' : 'div';
+
 		$html .= '<li class="' . esc_attr( $css_classes . ( $has_submenu ? ' has-child' : '' ) ) .
 			( $is_active ? ' current-menu-item' : '' ) . '"' . $style_attribute . '>' .
-			'<a class="wp-block-navigation-link__content"';
+			'<' . $item_tag . ' class="wp-block-navigation-link__content"';
 
-		// Start appending HTML attributes to anchor tag.
-		if ( isset( $block['attrs']['url'] ) ) {
-			$html .= ' href="' . esc_url( $block['attrs']['url'] ) . '"';
+		if ( $item_url ) {
+				$html .= ' href="' . $item_url . '"';
 		}
 
-		if ( isset( $block['attrs']['opensInNewTab'] ) && true === $block['attrs']['opensInNewTab'] ) {
+		if (
+			$item_url &&
+			isset( $block['attrs']['opensInNewTab'] ) &&
+			true === $block['attrs']['opensInNewTab']
+		) {
 			$html .= ' target="_blank"  ';
 		}
 		// End appending HTML attributes to anchor tag.
@@ -256,7 +278,7 @@ function block_core_navigation_build_html( $attributes, $block, $colors, $font_s
 
 		$html .= '</span>';
 
-		$html .= '</a>';
+		$html .= '</' . $item_tag . '>';
 		// End anchor tag content.
 
 		// Append submenu icon to top-level item.
