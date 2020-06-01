@@ -183,6 +183,7 @@ export default function InsertionPoint( {
 							<Inserter
 								position="bottom center"
 								clientId={ inserterClientId }
+								__experimentalIsQuick
 							/>
 						</div>
 					</div>
