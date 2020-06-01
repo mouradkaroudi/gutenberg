@@ -28,7 +28,7 @@ describe( 'selectors', () => {
 		it( 'should return false if there are no calls pending', () => {
 			const state = {
 				downloadableBlocks: {
-					pendingBlockRequests: 0,
+					pendingSearchRequests: 0,
 				},
 			};
 			const isRequesting = isRequestingDownloadableBlocks( state );
@@ -39,7 +39,7 @@ describe( 'selectors', () => {
 		it( 'should return true if at least one call is pending', () => {
 			const state = {
 				downloadableBlocks: {
-					pendingBlockRequests: 1,
+					pendingSearchRequests: 1,
 				},
 			};
 			const isRequesting = isRequestingDownloadableBlocks( state );
