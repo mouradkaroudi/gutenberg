@@ -11,7 +11,7 @@ import edit from './edit';
 import metadata from './block.json';
 import save from './save';
 
-const { name } = metadata;
+const { name, attributes } = metadata;
 
 export { metadata, name };
 
@@ -19,6 +19,7 @@ export const settings = {
 	title: __( 'Column' ),
 	icon,
 	description: __( 'A single column within a columns block.' ),
+	attributes,
 	edit,
 	save,
 };
